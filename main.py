@@ -29,8 +29,12 @@ import lzma
 import base64
 import lxml
 import lxml.html
+import time
 import requests
-
+class ContentParsingError(Exception):
+    def __init__(self, expression, message):
+        self.expression = expression
+        self.message = message
 
 def get_all_articles__yahoo_finance():
     url = 'https://finance.yahoo.com'
@@ -41,12 +45,16 @@ def get_all_articles__yahoo_finance():
     for link in soup.find_all('a'):
         l = link.get('href')
         if l != None and l.startswith('https'):
-            if (len(str(l)) > 31):
-                if (str_ == str(l)[:31]):
-                    print(l)
-                    links.add(l)
+            print(l)
+            links.add(l)
+            # if (len(str(l)) > 31):
+            #     if (str_ == str(l)[:31]):
+            #         print(l)
+            #         links.add(l)
+    print("OK")
     return links
 #return links
+
 def get_article_info(url):
     # page = urlopen(url)
     # html_ = page.read()
@@ -60,36 +68,43 @@ def get_article_info(url):
         j += 1
         ch = str(url)[len(str(url))-j]
     article_ = str(url)[-(j-1):-5]
+    print(" OK")
     return str(url)[-(j-1):-5]
-#return atribute_ не знаю зачем, если я могу получить html код страницы во время обычного парсинга,
-# но если возвращать не str(soup), а atribute_ то в этом есть какой то смысл
+#return article_
+
 def parse_article__yahoo_finance(url):
     # page = urlopen(url)
     # html_ = page.read().decode('utf-8')
-    html_ = requests.get(url).content
-    soup = BeautifulSoup(html_, 'html.parser')
-    atribute_ = soup.find("h1", class_="").text
-    publication_dt_ = converter.parse(soup.find("time").text).isoformat()
-    language_ = detect(atribute_)
-    content_ = soup.find("div", class_="caas-body").text
-
-    href_ = url
-    parsing_dt_ = datetime.datetime.now().replace(microsecond=0).isoformat()
-    ArticleInfo = (
-        str(atribute_),
-        str(content_),
-        str(publication_dt_),
-        str(parsing_dt_),
-        str(soup),
-        str(href_),
-        str(language_)
-    )
-    return ArticleInfo
+    try:
+        html_ = requests.get(url).content
+        soup = BeautifulSoup(html_, 'html.parser')
+        attribute_ = soup.find("h1", class_="").text
+        publication_dt_ = converter.parse(soup.find("time").text).isoformat()
+        language_ = detect(attribute_)
+        content_ = soup.find("div", class_="caas-body").text
+        href_ = url
+        parsing_dt_ = datetime.datetime.now().replace(microsecond=0).isoformat()
+        ArticleInfo = (
+            str(attribute_),
+            str(content_),
+            str(publication_dt_),
+            str(parsing_dt_),
+            str(soup),
+            str(href_),
+            str(language_)
+        )
+    except AttributeError as e:
+        print (e)
+        return tuple()
+    else:
+        print(" OK")
+        return ArticleInfo
 #return ArticleInfo
+
 def save_to_disk(article_, ArticleInfo):
     try:
-        os.makedirs(article_)
-        with lzma.open(article_ + '/' + article_ + '.xz', "w") as file:
+        os.makedirs('result_parsing/' + article_)
+        with lzma.open('result_parsing/' + article_ + '/' + article_ + '.xz', "w") as file:
             file.write(ArticleInfo[4].encode('utf-8'))
             file.close()
         jsonFile = {
@@ -101,36 +116,43 @@ def save_to_disk(article_, ArticleInfo):
             'language': ArticleInfo[6]
         }
         #print(jsonFile)
-        with lzma.open(article_ + '/' + 'json' + article_ + '.xz', "w") as file:
+        with lzma.open('result_parsing/' + article_ + '/' + 'json' + article_ + '.xz', "w") as file:
              file.write(str(jsonFile).encode('utf-8'))
              file.close()
              #print('t')
+        print(" OK")
     except FileExistsError:
         # directory already exists
         pass
 #save
 
-print("start")
-print("getting links")
-links = set()
-links = get_all_articles__yahoo_finance()
-for link in links:
-    print (link)
-print("ok")
-for link in links:
-    print(" parsing start " + link)
-    print(" getting article_")
-    article_ = get_article_info(link)
-    print(" ok")
-    print(" getting ArticleInfo")
-    ArticleInfo = parse_article__yahoo_finance(link)
-    print(" ok")
-    print(" saving file")
-    save_to_disk(article_, ArticleInfo)
-    print(" ok")
-    print("parsing final")
-print("done")
+def main():
+    print("start")
+    print("getting links")
+    links = set()
+    links = get_all_articles__yahoo_finance()
+    for link in links:
+        print (link)
 
+    for link in links:
+        print(" parsing start " + link)
+        print(" getting article_")
+        article_ = get_article_info(link)
+
+        print(" getting ArticleInfo")
+        ArticleInfo = parse_article__yahoo_finance(link)
+        if (len(ArticleInfo) == 0):continue
+        print(" saving file")
+        save_to_disk(article_, ArticleInfo)
+
+        print(" parsing link final")
+    print("done")
+def parser(time):
+    while True:
+        main()
+        time.sleep(3600/time)
+
+main()
 
 
 # print("start")
